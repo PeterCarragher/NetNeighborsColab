@@ -12,17 +12,26 @@ Based on research by Carragher et al. (ICWSM 2024, ACM TIST 2025) on misinformat
 
 ```
 NetNeighborsColab/
-├── discovery_notebook.ipynb    # Main Colab notebook (user entry point)
-├── NetNeighbors/               # Git submodule containing core tools
-│   ├── src/DiscoveryTool.java  # Java discovery algorithm using WebGraph library
-│   ├── webgraph_discovery.py   # Python wrapper that calls Java tool via subprocess
-│   ├── utils.py                # Storage setup, GCS mounting, file downloads
+├── discovery_notebook.ipynb      # Original notebook (subprocess-based, slower)
+├── discovery_notebook_jvm.ipynb  # JVM notebook (py4j-based, fast!)
+├── NetNeighbors/                 # Git submodule containing core tools
+│   ├── src/
+│   │   ├── DiscoveryTool.java    # Standalone Java tool (for subprocess approach)
+│   │   └── GraphLookup.java      # Helper for JShell/py4j usage
+│   ├── graph_bridge.py           # py4j bridge - persistent JVM, instant queries
+│   ├── webgraph_discovery.py     # Subprocess wrapper (slower, spawns new JVM each query)
+│   ├── utils.py                  # Storage setup, GCS mounting, file downloads
 │   └── scripts/
-│       ├── setup.sh            # Installs Java 17, Maven, gcsfuse, builds cc-webgraph
-│       └── verify.sh           # Validates installation (Java, JAR, graph files)
+│       ├── setup.sh              # Installs Java 17, Maven, py4j, builds cc-webgraph
+│       └── verify.sh             # Validates installation
 ```
 
-**Data Flow:** User input (ipywidgets) → Python validation → seeds.txt → Java DiscoveryTool → results.csv → Pandas DataFrame display
+**Two Backends:**
+
+| Backend | File | Performance | How it works |
+|---------|------|-------------|--------------|
+| py4j (recommended) | `graph_bridge.py` | ~5s load, then **instant** queries | Persistent JVM, graph stays in memory |
+| subprocess | `webgraph_discovery.py` | ~30s+ per query | Spawns new JVM each time, reloads graph |
 
 **Key Dependency:** Requires [cc-webgraph](https://github.com/commoncrawl/cc-webgraph) JAR (cloned and built by setup.sh).
 
