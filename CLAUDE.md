@@ -1,0 +1,62 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+NetNeighborsColab is a Google Colab notebook for discovering related domains using CommonCrawl webgraph link topology analysis. Given seed domains, it finds other domains connected via backlinks or outlinks in a 93.9M domain, 1.6B edge web graph.
+
+Based on research by Carragher et al. (ICWSM 2024, ACM TIST 2025) on misinformation source detection.
+
+## Architecture
+
+```
+NetNeighborsColab/
+├── discovery_notebook.ipynb    # Main Colab notebook (user entry point)
+├── NetNeighbors/               # Git submodule containing core tools
+│   ├── src/DiscoveryTool.java  # Java discovery algorithm using WebGraph library
+│   ├── webgraph_discovery.py   # Python wrapper that calls Java tool via subprocess
+│   ├── utils.py                # Storage setup, GCS mounting, file downloads
+│   └── scripts/
+│       ├── setup.sh            # Installs Java 17, Maven, gcsfuse, builds cc-webgraph
+│       └── verify.sh           # Validates installation (Java, JAR, graph files)
+```
+
+**Data Flow:** User input (ipywidgets) → Python validation → seeds.txt → Java DiscoveryTool → results.csv → Pandas DataFrame display
+
+**Key Dependency:** Requires [cc-webgraph](https://github.com/commoncrawl/cc-webgraph) JAR (cloned and built by setup.sh).
+
+## Development Notes
+
+- **Target environment:** Google Colab Pro with High-RAM runtime (40GB+ required)
+- **Webgraph version:** `cc-main-2025-26-nov-dec-jan` (configurable in notebook)
+- **Java heap:** 48GB (`-Xmx48g`) to hold ~30GB webgraph in memory
+- **Graph files:** Downloaded from `https://data.commoncrawl.org/projects/hyperlinkgraph/`
+
+### The DiscoveryTool.java Algorithm
+
+1. Loads BVGraph (forward for outlinks, transpose `-t` for backlinks)
+2. Builds bidirectional domain↔ID mappings from vertices file
+3. For each seed, iterates successors and counts occurrences
+4. Filters by min_connections threshold, outputs sorted CSV
+
+### Testing Changes
+
+Run setup.sh manually to compile DiscoveryTool:
+```bash
+javac -cp "/path/to/cc-webgraph-0.1-SNAPSHOT-jar-with-dependencies.jar" \
+    -d NetNeighbors/bin NetNeighbors/src/DiscoveryTool.java
+```
+
+Test discovery tool directly:
+```bash
+java -cp "cc-webgraph.jar:NetNeighbors/bin" DiscoveryTool \
+    --graph /path/to/graph-base --vertices /path/to/vertices.txt.gz \
+    --seeds seeds.txt --output results.csv --min-connections 5 --direction backlinks
+```
+
+## Important Paths (in Colab)
+
+- `/content/cc-webgraph/target/cc-webgraph-0.1-SNAPSHOT-jar-with-dependencies.jar`
+- `/content/NetNeighbors/bin/DiscoveryTool.class`
+- `/content/webgraph/` (or GCS mount for persistence)
